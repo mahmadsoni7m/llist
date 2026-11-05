@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.ListOffice" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#050B08</item>
+        <item name="android:navigationBarColor">#0C1712</item>
+        <item name="android:windowBackground">#050B08</item>
+    </style>
+</resources>
