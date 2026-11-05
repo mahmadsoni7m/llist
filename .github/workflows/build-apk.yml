@@ -29,6 +29,16 @@ jobs:
         with:
           gradle-version: "8.7"
 
+      - name: Download handwriting fonts (OFL)
+        run: |
+          D=app/src/main/assets/fonts
+          B=https://github.com/google/fonts/raw/main/ofl
+          get() { curl -fsSL --retry 3 -o "$D/$1" "$B/$2" && echo "OK $1 $(stat -c%s "$D/$1") bytes" || echo "::warning::Шрифт $1 зеркашӣ нашуд ($2)"; }
+          get natural.ttf "caveat/Caveat%5Bwght%5D.ttf"
+          get beautiful.ttf "marckscript/MarckScript-Regular.ttf"
+          get clean.ttf "badscript/BadScript-Regular.ttf"
+          ls -la "$D"
+
       - name: Unit tests
         run: gradle --no-daemon testDebugUnitTest
 

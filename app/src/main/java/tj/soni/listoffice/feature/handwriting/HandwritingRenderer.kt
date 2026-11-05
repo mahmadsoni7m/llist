@@ -32,7 +32,7 @@ class HandwritingRenderer(private val context: Context) {
     companion object {
         const val W = 1240
         const val H = 1754
-        const val TAJIK_LETTERS = "ҒғҚқҲҳҶҷӮӯӢӣ"
+        const val CYRILLIC_BASE = "абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЖЗИКЛМНОПРСТУФХЦЧШЩЭЮЯ"
         private const val INK = 0xFF1A3FB5L
     }
 
@@ -42,11 +42,52 @@ class HandwritingRenderer(private val context: Context) {
         null
     }
 
-    /** true, агар шрифт ҳамаи ҳарфҳои тоҷикиро дошта бошад. */
+    /**
+     * true, агар шрифт мавҷуд бошад ва кириллии асосиро дошта бошад.
+     * Ҳарфҳои тоҷикӣ (Ғ Қ Ҳ Ҷ Ӣ Ӯ) аз ҳарфи асосӣ + нишона худи барнома сохта мешаванд.
+     */
     fun coversTajik(asset: String): Boolean {
         val tf = typeface(asset) ?: return false
         val p = Paint().apply { typeface = tf }
-        return TAJIK_LETTERS.all { p.hasGlyph(it.toString()) }
+        return CYRILLIC_BASE.all { p.hasGlyph(it.toString()) }
+    }
+
+    private fun composeBase(ch: Char): Pair<Char, String>? = when (ch) {
+        'Ғ' -> Pair('Г', "bar")
+        'ғ' -> Pair('г', "bar")
+        'Қ' -> Pair('К', "tail")
+        'қ' -> Pair('к', "tail")
+        'Ҳ' -> Pair('Х', "tail")
+        'ҳ' -> Pair('х', "tail")
+        'Ҷ' -> Pair('Ч', "tail")
+        'ҷ' -> Pair('ч', "tail")
+        'Ӣ' -> Pair('И', "macron")
+        'ӣ' -> Pair('и', "macron")
+        'Ӯ' -> Pair('У', "macron")
+        'ӯ' -> Pair('у', "macron")
+        else -> null
+    }
+
+    private fun drawMark(c: Canvas, mark: String, upper: Boolean, cw: Float, p: Paint) {
+        val sz = p.textSize
+        val m = Paint(p).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = maxOf(2.5f, sz * 0.055f)
+            strokeCap = Paint.Cap.ROUND
+        }
+        when (mark) {
+            "macron" -> {
+                val y = if (upper) -sz * 0.95f else -sz * 0.68f
+                c.drawLine(cw * 0.2f, y, cw * 0.85f, y, m)
+            }
+            "bar" -> {
+                val y = if (upper) -sz * 0.38f else -sz * 0.25f
+                c.drawLine(-cw * 0.02f, y, cw * 0.6f, y, m)
+            }
+            else -> {
+                c.drawLine(cw * 0.8f, 0f, cw * 0.9f, sz * 0.26f, m)
+            }
+        }
     }
 
     /**
@@ -64,6 +105,8 @@ class HandwritingRenderer(private val context: Context) {
     ): Int {
         val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = INK.toInt()
+            style = Paint.Style.FILL_AND_STROKE
+            strokeWidth = params.sizePx * 0.012f
             textSize = params.sizePx
             typeface = typeface(params.fontAsset) ?: Typeface.create(Typeface.SANS_SERIF, Typeface.ITALIC)
         }
@@ -114,23 +157,28 @@ class HandwritingRenderer(private val context: Context) {
                     y += lineH
                 }
                 if (!ensure()) { stopped = true; break@outer }
+                val wordDy = (rnd.nextFloat() * 2f - 1f) * params.jitterPx * 0.8f
                 for (ch in word) {
                     val s = ch.toString()
-                    val paint = if (ink.hasGlyph(s)) ink else fallback
-                    val cw = paint.measureText(s)
+                    val comp = if (!ink.hasGlyph(s)) composeBase(ch) else null
+                    val drawS = comp?.first?.toString() ?: s
+                    val paint = if (ink.hasGlyph(drawS)) ink else fallback
+                    val cw = paint.measureText(drawS)
                     if (x + cw > right) {
                         x = left
                         y += lineH
                         if (!ensure()) { stopped = true; break@outer }
                     }
                     val drift = (Math.sin(x / 90.0 + y / 50.0) * params.jitterPx * 0.6).toFloat()
-                    val dy = (rnd.nextFloat() * 2f - 1f) * params.jitterPx * 0.5f + drift
+                    val dy = (rnd.nextFloat() * 2f - 1f) * params.jitterPx * 0.5f + drift + wordDy
                     val rot = (rnd.nextFloat() * 2f - 1f) * params.rotationDeg
                     paint.alpha = 215 + rnd.nextInt(40)
                     cv.save()
                     cv.translate(x, y + dy)
                     cv.rotate(rot)
-                    cv.drawText(s, 0f, 0f, paint)
+                    cv.skew((rnd.nextFloat() * 2f - 1f) * 0.06f, 0f)
+                    cv.drawText(drawS, 0f, 0f, paint)
+                    if (comp != null && paint === ink) drawMark(cv, comp.second, ch.isUpperCase(), cw, paint)
                     cv.restore()
                     x += cw + params.spacingPx * (0.6f + rnd.nextFloat() * 0.8f)
                 }

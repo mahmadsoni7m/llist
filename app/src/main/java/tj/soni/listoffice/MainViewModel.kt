@@ -70,8 +70,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             val bad = listOf("natural.ttf", "beautiful.ttf", "clean.ttf").filter { !renderer.coversTajik(it) }
             withContext(Dispatchers.Main) {
                 fontWarning = if (bad.isEmpty()) null else
-                    "Шрифтҳои дастнавис (${bad.joinToString()}) дар assets/fonts нестанд ё ҳарфҳои тоҷикӣ надоранд. " +
-                        "Ҳарфҳои намерасида бо шрифти системаи Android навишта мешаванд."
+                    "Шрифтҳои дастнавис (${bad.joinToString()}) дар APK нестанд ё кириллиро надоранд, барои ҳамин хати оддии системавӣ истифода мешавад. " +
+                        "Дар GitHub Actions шрифтҳо худкор зеркашӣ мешаванд; build-ро аз нав иҷро кунед ва APK-и навро насб намоед."
             }
         }
     }
@@ -174,9 +174,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     // ---------- Handwriting Studio ----------
 
     fun hwParams(): HwParams = when (hwStyle) {
-        0 -> HwParams("natural.ttf", 46f, 2.2f, 2.5f, 0.8f)
-        1 -> HwParams("beautiful.ttf", 50f, 1.0f, 1.0f, 1.4f)
-        2 -> HwParams("clean.ttf", 44f, 0.4f, 0.3f, 0.6f)
+        0 -> HwParams("natural.ttf", 58f, 2.0f, 2.5f, 0.6f)
+        1 -> HwParams("beautiful.ttf", 50f, 1.0f, 1.0f, 1.2f)
+        2 -> HwParams("clean.ttf", 46f, 0.4f, 0.3f, 0.6f)
         else -> HwParams("natural.ttf", hwCustomSize, hwCustomRot, hwCustomJitter, 0.8f)
     }
 
