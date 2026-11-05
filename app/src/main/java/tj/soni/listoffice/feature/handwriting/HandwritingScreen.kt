@@ -67,10 +67,27 @@ fun HandwritingScreen(vm: MainViewModel) {
 
         Text("Қоғаз")
         ChipRow(Paper.values().map { it.label }, vm.hwPaper) { vm.hwPaper = it }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Switch(checked = vm.hwMargin, onCheckedChange = { vm.hwMargin = it })
-            Text("Хати ҳошия")
+        if (vm.hwStyle != 3) {
+            Text("Андозаи хат: ${(vm.hwSizeScale * 100).toInt()}%")
+            Slider(vm.hwSizeScale, { vm.hwSizeScale = it }, valueRange = 0.6f..1.8f)
         }
+
+        PremiumCard(Modifier.fillMaxWidth()) {
+            Text("Ҳошияҳо (мм)", style = MaterialTheme.typography.titleMedium)
+            Text("Чап: ${vm.hwLeft.toInt()}")
+            Slider(vm.hwLeft, { vm.hwLeft = it }, valueRange = 0f..50f)
+            Text("Рост: ${vm.hwRight.toInt()}")
+            Slider(vm.hwRight, { vm.hwRight = it }, valueRange = 0f..50f)
+            Text("Боло: ${vm.hwTop.toInt()}")
+            Slider(vm.hwTop, { vm.hwTop = it }, valueRange = 0f..60f)
+            Text("Поён: ${vm.hwBottom.toInt()}")
+            Slider(vm.hwBottom, { vm.hwBottom = it }, valueRange = 0f..60f)
+        }
+
+        SwitchRow("Хати ҳошияи сурх", vm.hwMargin) { vm.hwMargin = it }
+        SwitchRow("Сатри сурх (ақибнишинии аввали сатр)", vm.hwIndent) { vm.hwIndent = it }
+        SwitchRow("Сарлавҳаҳои ҳарфи калон дар марказ", vm.hwCenter) { vm.hwCenter = it }
+        SwitchRow("Рақами саҳифа", vm.hwPageNum) { vm.hwPageNum = it }
 
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
             ToolButton(Icons.Default.Create, "Пешнамоиш") { vm.previewHandwriting() }
@@ -91,5 +108,13 @@ fun HandwritingScreen(vm: MainViewModel) {
             }
             Text("Пешнамоиш: то 3 саҳифаи аввал. PDF ҳамаи саҳифаҳоро дорад.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+}
+
+@Composable
+private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Switch(checked = checked, onCheckedChange = onChange)
+        Text(label)
     }
 }

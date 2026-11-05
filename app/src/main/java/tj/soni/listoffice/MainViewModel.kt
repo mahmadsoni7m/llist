@@ -57,7 +57,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var hwText by mutableStateOf("")
     var hwStyle by mutableIntStateOf(0)
     var hwPaper by mutableIntStateOf(1)
-    var hwMargin by mutableStateOf(true)
+    var hwMargin by mutableStateOf(false)
+    var hwLeft by mutableFloatStateOf(20f)
+    var hwRight by mutableFloatStateOf(10f)
+    var hwTop by mutableFloatStateOf(15f)
+    var hwBottom by mutableFloatStateOf(15f)
+    var hwIndent by mutableStateOf(true)
+    var hwCenter by mutableStateOf(true)
+    var hwPageNum by mutableStateOf(true)
+    var hwSizeScale by mutableFloatStateOf(1f)
     var hwCustomSize by mutableFloatStateOf(46f)
     var hwCustomRot by mutableFloatStateOf(2f)
     var hwCustomJitter by mutableFloatStateOf(2f)
@@ -173,10 +181,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- Handwriting Studio ----------
 
+    fun hwLayout(): HwLayout = HwLayout(
+        leftMm = hwLeft, rightMm = hwRight, topMm = hwTop, bottomMm = hwBottom,
+        marginLine = hwMargin, indent = hwIndent, centerTitles = hwCenter, pageNumbers = hwPageNum
+    )
+
     fun hwParams(): HwParams = when (hwStyle) {
-        0 -> HwParams("natural.ttf", 58f, 2.0f, 2.5f, 0.6f)
-        1 -> HwParams("beautiful.ttf", 50f, 1.0f, 1.0f, 1.2f)
-        2 -> HwParams("clean.ttf", 46f, 0.4f, 0.3f, 0.6f)
+        0 -> HwParams("natural.ttf", 50f * hwSizeScale, 1.6f, 2.0f, 0.5f)
+        1 -> HwParams("beautiful.ttf", 52f * hwSizeScale, 0.8f, 1.0f, 0.8f)
+        2 -> HwParams("clean.ttf", 46f * hwSizeScale, 0.4f, 0.3f, 0.6f)
         else -> HwParams("natural.ttf", hwCustomSize, hwCustomRot, hwCustomJitter, 0.8f)
     }
 
@@ -187,14 +200,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         runIo("Пешнамоиш сохта нашуд", {
             val list = ArrayList<Bitmap>()
-            renderer.render(hwText, hwParams(), Paper.values()[hwPaper], hwMargin, 0.5f, 3) { list.add(it) }
+            renderer.render(hwText, hwParams(), Paper.values()[hwPaper], hwLayout(), 0.5f, 3) { list.add(it) }
             list as List<Bitmap>
         }) { list -> hwPreview = list }
     }
 
     private fun buildHandwritingPdf(): File {
         val f = repo.fileFor("Дастнавис-${System.currentTimeMillis() / 1000}", "pdf")
-        renderer.exportPdf(hwText, hwParams(), Paper.values()[hwPaper], hwMargin, f)
+        renderer.exportPdf(hwText, hwParams(), Paper.values()[hwPaper], hwLayout(), f)
         return f
     }
 
@@ -215,7 +228,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         runIo("Чоп омода нашуд", {
             val f = File(repo.cacheDir, "handwriting.pdf")
-            renderer.exportPdf(hwText, hwParams(), Paper.values()[hwPaper], hwMargin, f)
+            renderer.exportPdf(hwText, hwParams(), Paper.values()[hwPaper], hwLayout(), f)
             f
         }) { f -> printPdfFile(context, f, "Дастнавис") }
     }

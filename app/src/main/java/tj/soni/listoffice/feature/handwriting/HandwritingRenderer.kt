@@ -26,14 +26,28 @@ data class HwParams(
     val spacingPx: Float
 )
 
+/** Тарҳбандии саҳифа: ҳошияҳо бо миллиметр (чап, рост, боло, поён) ва имконоти иловагӣ. */
+data class HwLayout(
+    val leftMm: Float = 20f,
+    val rightMm: Float = 10f,
+    val topMm: Float = 15f,
+    val bottomMm: Float = 15f,
+    val marginLine: Boolean = true,
+    val indent: Boolean = true,
+    val centerTitles: Boolean = true,
+    val pageNumbers: Boolean = true
+)
+
 /** Матнро ба саҳифаҳои A4 бо дастнависи кабуд (ручка) табдил медиҳад. */
 class HandwritingRenderer(private val context: Context) {
 
     companion object {
         const val W = 1240
         const val H = 1754
+        const val PX_PER_MM = 1240f / 210f
         const val CYRILLIC_BASE = "абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЖЗИКЛМНОПРСТУФХЦЧШЩЭЮЯ"
         private const val INK = 0xFF1A3FB5L
+        private const val INDENT_PX = 90f
     }
 
     fun typeface(asset: String): Typeface? = try {
@@ -90,15 +104,20 @@ class HandwritingRenderer(private val context: Context) {
         }
     }
 
+    private fun isTitle(para: String): Boolean {
+        val t = para.trim()
+        return t.length in 1..60 && t.any { it.isLetter() } && t.none { it.isLowerCase() }
+    }
+
     /**
-     * Саҳифаҳоро яке-яке тавлид мекунад ва ба [onPage] медиҳад (bitmap-ро қабулкунанда recycle мекунад).
+     * Саҳифаҳоро яке-яке тавлид мекунад ва ба [onPage] медиҳад (қабулкунанда bitmap-ро recycle мекунад).
      * [scale] — андозаи bitmap нисбат ба 1240x1754. [maxPages] — ҳадди саҳифаҳо. Шумораи саҳифаҳоро бармегардонад.
      */
     fun render(
         text: String,
         params: HwParams,
         paper: Paper,
-        marginLine: Boolean,
+        layout: HwLayout,
         scale: Float,
         maxPages: Int,
         onPage: (Bitmap) -> Unit
@@ -113,10 +132,10 @@ class HandwritingRenderer(private val context: Context) {
         val fallback = Paint(ink).apply {
             typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.ITALIC)
         }
-        val left = if (marginLine) 190f else 120f
-        val right = W - 110f
-        val top = 170f
-        val bottom = H - 140f
+        val left = (layout.leftMm * PX_PER_MM).coerceIn(0f, W * 0.5f)
+        val right = maxOf(W - layout.rightMm * PX_PER_MM, left + 300f)
+        val top = (layout.topMm * PX_PER_MM).coerceIn(0f, H * 0.4f)
+        val bottom = maxOf(H - layout.bottomMm * PX_PER_MM, top + 300f)
         val lineH = if (paper == Paper.GRID) 64f else maxOf(60f, params.sizePx * 1.35f)
         val spaceW = ink.measureText(" ") + params.spacingPx * 2
         val rnd = Random(text.hashCode().toLong())
@@ -125,17 +144,27 @@ class HandwritingRenderer(private val context: Context) {
         var bmp = Bitmap.createBitmap((W * scale).toInt(), (H * scale).toInt(), Bitmap.Config.ARGB_8888)
         var cv = Canvas(bmp)
         cv.scale(scale, scale)
-        drawBackground(cv, paper, marginLine, left, top, bottom, lineH)
+        drawBackground(cv, paper, layout.marginLine, left, top, lineH)
         var y = top + lineH - 8f
 
-        fun nextPage(): Boolean {
+        fun finishPage() {
+            if (layout.pageNumbers) {
+                val num = (count + 1).toString()
+                val numPaint = Paint(ink).apply { textSize = params.sizePx * 0.8f; alpha = 230 }
+                val ny = H - maxOf(30f, layout.bottomMm * PX_PER_MM * 0.45f)
+                cv.drawText(num, (W - numPaint.measureText(num)) / 2f, ny, numPaint)
+            }
             onPage(bmp)
             count++
+        }
+
+        fun nextPage(): Boolean {
+            finishPage()
             if (count >= maxPages) return false
             bmp = Bitmap.createBitmap((W * scale).toInt(), (H * scale).toInt(), Bitmap.Config.ARGB_8888)
             cv = Canvas(bmp)
             cv.scale(scale, scale)
-            drawBackground(cv, paper, marginLine, left, top, bottom, lineH)
+            drawBackground(cv, paper, layout.marginLine, left, top, lineH)
             y = top + lineH - 8f
             return true
         }
@@ -149,10 +178,17 @@ class HandwritingRenderer(private val context: Context) {
                 y += lineH
                 continue
             }
+            val centered = layout.centerTitles && isTitle(para)
             var x = left
+            if (centered) {
+                val tw = ink.measureText(words.joinToString(" ")) + para.length * params.spacingPx
+                x = if (tw < right - left) left + (right - left - tw) / 2f else left
+            } else if (layout.indent) {
+                x = left + INDENT_PX
+            }
             for (word in words) {
                 val ww = ink.measureText(word) + word.length * params.spacingPx
-                if (x > left && x + ww > right) {
+                if (x > left && x + ww > right && !centered) {
                     x = left
                     y += lineH
                 }
@@ -186,16 +222,13 @@ class HandwritingRenderer(private val context: Context) {
             }
             y += lineH
         }
-        if (!stopped) {
-            onPage(bmp)
-            count++
-        }
+        if (!stopped) finishPage()
         return count
     }
 
     private fun drawBackground(
         c: Canvas, paper: Paper, marginLine: Boolean,
-        left: Float, top: Float, bottom: Float, lineH: Float
+        left: Float, top: Float, lineH: Float
     ) {
         c.drawColor(Color.WHITE)
         val line = Paint().apply {
@@ -229,18 +262,19 @@ class HandwritingRenderer(private val context: Context) {
                 color = 0xFFE57373.toInt()
                 strokeWidth = 3f
             }
-            c.drawLine(left - 30f, 0f, left - 30f, H.toFloat(), m)
+            val x = maxOf(left - 14f, 6f)
+            c.drawLine(x, 0f, x, H.toFloat(), m)
         }
     }
 
     /** PDF-и чопшавандаи A4 месозад. Шумораи саҳифаҳоро бармегардонад. */
     fun exportPdf(
-        text: String, params: HwParams, paper: Paper, marginLine: Boolean, out: File, maxPages: Int = 50
+        text: String, params: HwParams, paper: Paper, layout: HwLayout, out: File, maxPages: Int = 50
     ): Int {
         val doc = PdfDocument()
         val paint = Paint(Paint.FILTER_BITMAP_FLAG)
         var n = 0
-        render(text, params, paper, marginLine, 1f, maxPages) { bmp ->
+        render(text, params, paper, layout, 1f, maxPages) { bmp ->
             n++
             val page = doc.startPage(PdfDocument.PageInfo.Builder(595, 842, n).create())
             page.canvas.drawBitmap(bmp, null, RectF(0f, 0f, 595f, 842f), paint)
